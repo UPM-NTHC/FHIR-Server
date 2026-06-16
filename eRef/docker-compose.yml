@@ -1,0 +1,36 @@
+services:
+  fhir:
+    container_name: eref-hapi
+    image: "hapi-custom:latest"
+    ports:
+      - "8081:8080"
+    configs:
+      - source: hapi
+        target: /app/config/application.yaml
+      - source: mdm-rules
+        target: /app/config/mdm-rules.json
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    container_name: eref-db
+    image: "postgres:17.2-bookworm"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: hapi
+    volumes:
+      - ./eref.postgress.data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d hapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+configs:
+  hapi:
+    file: ./application.yaml
+  mdm-rules:
+    file: ./mdm-rules.json
