@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: ereferral-server
+  main:
+    allow-bean-definition-overriding: true
+
+hapi:
+  fhir:
+    fhir_version: R4
+
+server:
+  port: 8080

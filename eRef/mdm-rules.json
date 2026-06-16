@@ -1,0 +1,43 @@
+{
+  "version": "1",
+  "mdmTypes": ["Patient"],
+
+  "candidateSearchParams": [
+    {
+      "resourceType": "Patient",
+      "searchParam": "identifier"
+    }
+  ],
+
+  "candidateFilterSearchParams": [],
+
+  "matchFields": [
+    {
+      "name": "philsys-id",
+      "resourceType": "Patient",
+      "resourcePath": "identifier",
+      "matcher": {
+        "algorithm": "IDENTIFIER",
+        "identifierSystem": "http://philsys.gov.ph/fhir/Identifier/philsys-id"
+      }
+    },
+    {
+      "name": "philhealth-id",
+      "resourceType": "Patient",
+      "resourcePath": "identifier",
+      "matcher": {
+        "algorithm": "IDENTIFIER",
+        "identifierSystem": "http://philhealth.gov.ph/fhir/Identifier/philhealth-id"
+      }
+    }
+  ],
+
+  "matchResultMap": {
+    "philsys-id": "MATCH",
+    "philhealth-id": "MATCH"
+  },
+
+  "eidSystems": {
+    "Patient": "http://philsys.gov.ph/fhir/Identifier/philsys-id"
+  }
+}
