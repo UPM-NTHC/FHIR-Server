@@ -42,7 +42,7 @@ hapi:
         version: 0.1.0
         reloadExisting: false
         installMode: STORE_AND_INSTALL
-        packageUrl: https://build.fhir.org/ig/ph-ereferral-organization/ph-ereferral/package.tgz
+        packageUrl: https://fhirhub.telehealth.ph/IG/PH-eReferral/package.tgz
         fetchDependencies: true
         dependencyExcludes:
            - "hl7.fhir.uv.extensions"
