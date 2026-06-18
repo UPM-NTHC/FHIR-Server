@@ -26,6 +26,7 @@ services:
       SPRING_MAIN_ALLOW_CIRCULAR_REFERENCES: "true"
     volumes:
       - ./config:/app/config
-
+      - ./config/mdm-rules.json:/app/config/mdm-rules.json
+      
 volumes:
   eref-db-data:
