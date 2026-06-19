@@ -66,6 +66,7 @@ hapi:
           - SearchParameter
           - NamingSystem
           - Subscription
+          - ImplementationGuide
           # So that the passthrough validation will go to Ontoserver
           # Caveat. Longer Ping Pong validation 
           # - CodeSystem
@@ -85,6 +86,7 @@ hapi:
           - SearchParameter
           - NamingSystem
           - Subscription
+          - ImplementationGuide # Not sure if needed
           # So that the passthrough validation will go to Ontoserver
           # Caveat. Longer Ping Pong validation 
           # - CodeSystem
@@ -103,6 +105,7 @@ hapi:
         installMode: STORE_AND_INSTALL
         fetchDependencies: true
         installResourceTypes:
+          - ImplementationGuide
           - StructureDefinition
           - SearchParameter
         dependencyExcludes:
@@ -118,12 +121,29 @@ hapi:
       - http://loinc.org/*
       - https://loinc.org/*
     remote_terminology_service:
+      # UCUM not handled correctly on Ontoserver at the moment
+      ucum:
+        system: "http://loinc.org"
+        url: "https://tx.fhir.org/r4"
+      # The rest are routed to Ontoserver
       loinc:
         system: "http://loinc.org"
         url: "https://tx.fhirlab.net/fhir"
       snomed:
         system: "https://snomed.info/sct"
         url: "https://tx.fhirlab.net/fhir"
-      ucum:
-        system: "http://loinc.org"
-        url: "https://tx.fhir.org/r4"
+      phcw:
+        system: "https://fhir.doh.gov.ph/phcore/CodeSystem/PHCW"
+        url: "https://tx.fhirlab.net/fhir"
+      psoc:
+        system: "https://fhir.doh.gov.ph/phcore/CodeSystem/PSOC"
+        url: "https://tx.fhirlab.net/fhir"
+      psced-level:
+        system: "https://psa.gov.ph/classification/psced/level"
+        url: "https://tx.fhirlab.net/fhir"
+      psgc:
+        system: "https://psa.gov.ph/classification/psgc"
+        url: "https://tx.fhirlab.net/fhir"
+      psoc-unit:
+        system: "https://psa.gov.ph/classification/psoc/unit"
+        url: "https://tx.fhirlab.net/fhir"
