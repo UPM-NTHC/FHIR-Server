@@ -95,6 +95,13 @@ hapi:
       - http://loinc.org/*
       - https://loinc.org/*
     remote_terminology_service:
-      all:
-        system: '*'
-        url: 'https://tx.fhirlab.net/fhir'
+      loinc:
+        system: "http://loinc.org"
+        url: "https://tx.fhirlab.net/fhir"
+      snomed:
+        system: "https://snomed.info/sct"
+        url: "https://tx.fhirlab.net/fhir"
+      ucum:
+        system: "http://loinc.org"
+        url: "https://tx.fhir.org/r4"
+
