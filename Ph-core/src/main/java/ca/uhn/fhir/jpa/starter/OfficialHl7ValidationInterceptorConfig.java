@@ -23,6 +23,15 @@ public class OfficialHl7ValidationInterceptorConfig {
     private static final String PHCORE_PATIENT_PROFILE =
             "https://fhir.doh.gov.ph/phcore/StructureDefinition/ph-core-patient";
 
+    private static final String EREF_PATIENT_PROFILE =
+            "https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-patient";
+
+    private static final String EREF_SERVICE_REQUEST_PROFILE =
+            "https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-service-request";
+
+    private static final String EREF_TASK_PROFILE =
+            "https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-task";
+
     private final FhirContext fhirContext;
     private final IInterceptorService interceptorService;
     private final ApplicationContext applicationContext;
@@ -45,7 +54,26 @@ public class OfficialHl7ValidationInterceptorConfig {
 
         ruleBuilder
                 .forResourcesOfType("Patient")
-                .requireAtLeastProfile(PHCORE_PATIENT_PROFILE)
+                .requireAtLeastOneProfileOf(
+                        PHCORE_PATIENT_PROFILE,
+                        EREF_PATIENT_PROFILE
+                )
+                .and()
+                .requireValidationToDeclaredProfiles()
+                .errorOnUnknownProfiles()
+                .rejectOnSeverity(ResultSeverityEnum.ERROR);
+
+        ruleBuilder
+                .forResourcesOfType("ServiceRequest")
+                .requireAtLeastProfile(EREF_SERVICE_REQUEST_PROFILE)
+                .and()
+                .requireValidationToDeclaredProfiles()
+                .errorOnUnknownProfiles()
+                .rejectOnSeverity(ResultSeverityEnum.ERROR);
+
+        ruleBuilder
+                .forResourcesOfType("Task")
+                .requireAtLeastProfile(EREF_TASK_PROFILE)
                 .and()
                 .requireValidationToDeclaredProfiles()
                 .errorOnUnknownProfiles()
@@ -58,6 +86,6 @@ public class OfficialHl7ValidationInterceptorConfig {
 
         interceptorService.registerInterceptor(interceptor);
 
-        ourLog.info(">>> PH CORE VALIDATOR LOADED. Rules count: {}", rules.size());
+        ourLog.info(">>> PH CORE + PH EREFERRAL VALIDATOR LOADED. Rules count: {}", rules.size());
     }
 }

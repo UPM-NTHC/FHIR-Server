@@ -1,6 +1,6 @@
 spring:
   main:
-    allow-circular-references: true
+    allow-circular-references: truedoc
   datasource:
     url: jdbc:postgresql://db:5432/hapi
     username: admin
@@ -68,12 +68,23 @@ hapi:
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-eReferral/package.tgz
         fetchDependencies: true
         dependencyExcludes:
-          - hl7.fhir.uv.extensions
-          - hl7.fhir.uv.extensions.r4
+          - "hl7.fhir.uv.extensions"
+          - "hl7.fhir.uv.extensions.r4"
           - hl7.fhir.uv.extensions.r5
-          - hl7.fhir.uv.extensions.r4#5.2.0
           - "hl7.terminology.r5"
           - "fhir.ph.core"
+      hl7_extensions_r4:
+        name: hl7.fhir.uv.extensions.r4
+        version: 5.3.0
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: true
+        installResourceTypes:
+          - StructureDefinition
+          - SearchParameter
+        dependencyExcludes:
+           - "hl7.terminology.r5"
+           - "hl7.terminology.r4"
     logical_urls:
       - http://terminology.hl7.org/*
       - https://terminology.hl7.org/*
