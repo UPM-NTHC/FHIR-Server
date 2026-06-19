@@ -1,0 +1,58 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values:
+              - eref-hapi
+              - phcore-hapi
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?(.*)'
+        target_label: container
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?(.*)'
+        target_label: job
+    pipeline_stages:
+      # Match access log lines (contain "verb=" pattern)
+      - match:
+          selector: '{job=~".+"}'
+          stages:
+            - regex:
+                expression: 'verb=(?P<verb>\S+) path=(?P<path>\S+) op=(?P<op>\S+) opName=(?P<op_name>\S*) resource=(?P<resource>\S+) remoteAddr=(?P<remote_addr>\S+) forwardedFor=(?P<forwarded_for>\S*) userAgent=(?P<user_agent>.+?) requestId=(?P<request_id>\S+) params=(?P<params>\S*) processingMs=(?P<processing_ms>\d+)'
+            - labels:
+                verb:
+                op:
+                resource:
+            - metrics:
+                fhir_request_duration_ms:
+                  type: Histogram
+                  description: "FHIR request processing time in milliseconds"
+                  source: processing_ms
+                  config:
+                    buckets: [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+      # Match error log lines
+      - match:
+          selector: '{job=~".+"} |= "error="'
+          stages:
+            - regex:
+                expression: 'verb=(?P<verb>\S+) path=(?P<path>\S+) op=(?P<op>\S+) resource=(?P<resource>\S+) remoteAddr=(?P<remote_addr>\S+) requestId=(?P<request_id>\S+) error=(?P<error>.+)'
+            - labels:
+                verb:
+                op:
+                resource:
+                level:
+              static_map:
+                level: error
