@@ -103,6 +103,152 @@ To enable the same logging on the Ph-core server, add the `logger` block to `Ph-
       log_exceptions: true
 ```
 
+## Docker Integration
+
+### Log Drivers
+
+Docker captures all container stdout/stderr and routes it through the configured [log driver](https://docs.docker.com/config/containers/logging/). The default `json-file` driver writes logs to `/var/lib/docker/containers/<id>/<id>-json.log` on the host.
+
+Since the HAPI FHIR server writes access logs to stdout via SLF4J/Logback, they are automatically captured by Docker with no additional configuration.
+
+### Viewing Logs
+
+```bash
+# Live tail of eRef server logs
+docker logs -f eref-hapi
+
+# Last 100 lines
+docker logs --tail 100 eref-hapi
+
+# Logs since a specific time
+docker logs --since 2024-01-15T10:00:00 eref-hapi
+
+# Filter access log lines (grep the logger name from Logback output)
+docker logs eref-hapi 2>&1 | grep "fhirtest.access"
+```
+
+### Log Rotation (json-file driver)
+
+The default `json-file` driver does not rotate logs unless configured. To prevent disk exhaustion, add logging options to `docker-compose.yml`:
+
+```yaml
+services:
+  eref-hapi:
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+```
+
+This retains up to 250 MB of logs (5 × 50 MB) per container before rotating.
+
+### Using Docker Compose Log Commands
+
+```bash
+# View logs from all services in the stack
+docker compose logs
+
+# Follow only the HAPI container
+docker compose logs -f eref-hapi
+
+# Show timestamps
+docker compose logs -t eref-hapi
+```
+
+### Forwarding to External Log Aggregators
+
+Docker supports swapping the log driver to send logs directly to external systems without modifying the application:
+
+| Driver | Target | Example |
+|--------|--------|---------|
+| `fluentd` | Fluentd / Fluent Bit → Elasticsearch, Loki | `driver: fluentd` |
+| `syslog` | Syslog server / rsyslog | `driver: syslog` |
+| `awslogs` | AWS CloudWatch Logs | `driver: awslogs` |
+| `gcplogs` | Google Cloud Logging | `driver: gcplogs` |
+| `gelf` | Graylog (GELF) | `driver: gelf` |
+| `splunk` | Splunk HEC | `driver: splunk` |
+
+Example — forwarding to a Fluent Bit sidecar:
+
+```yaml
+services:
+  eref-hapi:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "fhir.eref"
+```
+
+### Separating Access Logs from Application Logs
+
+By default, access logs (`fhirtest.access`) and application logs (Spring Boot, Hibernate, etc.) are mixed in the same stdout stream. To separate them:
+
+**Option 1 — Filter at the aggregator level** using the logger name pattern `fhirtest.access` in your Fluentd/Loki/ELK pipeline.
+
+**Option 2 — Custom Logback configuration** to route access logs to a separate file or appender:
+
+Mount a custom `logback-spring.xml` into the container:
+
+```yaml
+services:
+  eref-hapi:
+    volumes:
+      - ./config/logback-spring.xml:/app/config/logback-spring.xml
+```
+
+Example `logback-spring.xml` that splits access logs:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Application logs to stdout -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Access logs to separate file -->
+    <appender name="ACCESS_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/app/logs/access.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>/app/logs/access.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{ISO8601} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Route access logger to its own appender -->
+    <logger name="fhirtest.access" level="INFO" additivity="false">
+        <appender-ref ref="ACCESS_FILE" />
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
+```
+
+Then mount the logs directory as a volume to persist and access them from the host:
+
+```yaml
+    volumes:
+      - ./logs:/app/logs
+```
+
 ## Structured JSON Output (Optional)
 
-For production deployments that ingest logs into ELK, Loki, or CloudWatch, you can route the `fhirtest.access` logger to a JSON appender via a custom `logback-spring.xml`. This is not currently configured but can be added by mounting a logback config into the container at `/app/config/logback-spring.xml`.
+For production deployments that ingest logs into ELK, Loki, or CloudWatch, you can route the `fhirtest.access` logger to a JSON appender by using a Logback JSON encoder in the custom `logback-spring.xml` above. Replace the `<encoder>` in the access appender with:
+
+```xml
+<encoder class="net.logstash.logback.encoder.LogstashEncoder">
+    <includeMdcKeyName>requestId</includeMdcKeyName>
+</encoder>
+```
+
+This requires the `logstash-logback-encoder` dependency (already available in the HAPI FHIR classpath). The output will be one JSON object per line, compatible with structured log ingestion pipelines.
