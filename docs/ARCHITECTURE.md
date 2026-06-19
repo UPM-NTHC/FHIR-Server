@@ -292,6 +292,38 @@ FHIR-Server/
 | Container name | phcore-hapi | eref-hapi |
 | Port configurable via .env | No | Yes (`FHIR_SERVER_PORT`) |
 | IG dependency fetching | `fetchDependencies: true` | Selective (`false` for PH Core, `true` for eRef) |
+| Access logging | Disabled | Enabled (structured, `fhirtest.access`) |
+
+## Access Logging
+
+PHeRef has structured per-request access logging enabled via HAPI's `LoggingInterceptor`. Each FHIR request produces a log line with operational metadata suitable for statistical accounting and debugging.
+
+```mermaid
+flowchart LR
+    REQ["Incoming FHIR Request"] --> LI["LoggingInterceptor"]
+    LI --> LOG["Logger: fhirtest.access"]
+    LOG --> STDOUT["Container stdout<br/>(docker logs)"]
+```
+
+**Logged fields:**
+
+| Field | Description |
+|-------|-------------|
+| `verb` | HTTP method (GET, POST, PUT, DELETE) |
+| `path` | Servlet path (e.g. `/fhir/Patient`) |
+| `op` | FHIR operation type (read, search, create, etc.) |
+| `opName` | Named operation (e.g. `$validate`) |
+| `resource` | Resource type or ID |
+| `remoteAddr` | Client IP address |
+| `forwardedFor` | X-Forwarded-For header (proxy/load balancer) |
+| `userAgent` | Client User-Agent header |
+| `requestId` | Unique request identifier |
+| `params` | Query/search parameters |
+| `processingMs` | Server processing time in milliseconds |
+
+**Error logging** is also enabled — failed requests additionally capture `exceptionMessage`.
+
+**Note:** Ph-core does not currently have the logger enabled. The logger configuration exists in the HAPI starter codebase but is commented out in Ph-core's `application.yaml`.
 
 ## Build Pipeline
 
