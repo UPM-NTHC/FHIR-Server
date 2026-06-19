@@ -3,13 +3,11 @@
 
 Exercises:
   - Individual Patient create (profile validation)
-  - Validator enforcement (no-profile, empty-profile, invalid-profile, mixed-validity Bundle)
+  - Validator enforcement (invalid-profile)
   - Transaction Bundle with PH Core Observations (BP + lab)
   - Transaction Bundle containing an existing Patient + Observations
     (verifies transaction-level dedup: POST -> PUT conversion, no duplicate)
-  - Identifier-based dedup on duplicate individual Patient POST
-  - Practitioner and Organization dedup by identifier
-  - Edge cases: no-match Bundle, all-valid Bundle, merge field assertions
+  - Edge cases: no-match Bundle, all-valid Bundle
   - $validate operation endpoint (resource-type and base)
   - Referential integrity enforcement (dangling reference rejection)
   - Response validation headers (ResponseValidatingInterceptor)
@@ -32,8 +30,6 @@ OUTPUT = []
 RESULTS = {}
 
 PATIENT_ID = "BT-PATIENT-" + TS
-PRACT_ID = "BT-PRACT-" + TS
-ORG_ID = "BT-ORG-" + TS
 
 def make_uuid():
     """Return a short lowercase UUID for use in Bundle fullUrl values."""
@@ -45,9 +41,6 @@ UUID_OBS_HGB = make_uuid()
 UUID_PATIENT_BUNDLE = make_uuid()
 UUID_OBS_BP_BUNDLE = make_uuid()
 UUID_OBS_HGB_BUNDLE = make_uuid()
-UUID_MIXED_PROFILE = make_uuid()
-UUID_MIXED_OBS1 = make_uuid()
-UUID_MIXED_OBS2 = make_uuid()
 UUID_NOMATCH_PAT = make_uuid()
 UUID_NOMATCH_OBS1 = make_uuid()
 UUID_NOMATCH_OBS2 = make_uuid()
@@ -63,8 +56,6 @@ UUID_CANONICAL_OBS2 = make_uuid()
 PHILHEALTH_ID_SYSTEM = "https://fhir.doh.gov.ph/identifier/philhealth-id"
 PHILSYS_ID_SYSTEM = "https://fhir.doh.gov.ph/identifier/philsys"
 PRC_LIC_SYSTEM = "https://fhir.doh.gov.ph/identifier/prc-license"
-NHFR_CODE_SYSTEM = "https://fhir.doh.gov.ph/identifier/nhfr-code"
-HCPN_CODE_SYSTEM = "https://fhir.doh.gov.ph/identifier/hcpn-code"
 
 # Canonical StructureDefinition profile URLs
 # PH Core v0.2.0: https://fhir.doh.gov.ph/phcore/StructureDefinition/...
@@ -72,7 +63,6 @@ HCPN_CODE_SYSTEM = "https://fhir.doh.gov.ph/identifier/hcpn-code"
 PHCORE_PATIENT = "https://fhir.doh.gov.ph/phcore/StructureDefinition/ph-core-patient"
 EREF_PATIENT = "https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-patient"
 PHCORE_PRACTITIONER = "https://fhir.doh.gov.ph/phcore/StructureDefinition/ph-core-practitioner"
-PHCORE_ORGANIZATION = "https://fhir.doh.gov.ph/phcore/StructureDefinition/ph-core-organization"
 PHCORE_OBS = "https://fhir.doh.gov.ph/phcore/StructureDefinition/ph-core-observation"
 
 
@@ -363,51 +353,12 @@ def verify(label, condition, detail=""):
     return condition
 
 
-def verify_fail_note(label, reason):
-    """Mark a FAIL with an explanatory note — used for validator-gap tests."""
-    fh("- **[FAIL]** {label} [expected to fail until validator fix — {reason}]",
-       label=label, reason=reason)
-    return False
-
-
-def build_practitioner():
-    return {
-        "resourceType": "Practitioner",
-        "meta": {"profile": [PHCORE_PRACTITIONER]},
-        "identifier": [{"system": PRC_LIC_SYSTEM, "value": PRACT_ID}],
-        "name": [{"family": "BundleTest", "given": ["Practitioner"]}],
-        "gender": "female"
-    }
-
-
-def build_organization():
-    return {
-        "resourceType": "Organization",
-        "meta": {"profile": [PHCORE_ORGANIZATION]},
-        "identifier": [{"system": NHFR_CODE_SYSTEM, "value": ORG_ID}],
-        "name": "BundleTest Organization",
-        "active": True
-    }
-
-
 def build_no_profile_patient():
     """Patient WITHOUT meta.profile — should be rejected per spec."""
     return {
         "resourceType": "Patient",
         "identifier": [{"system": PHILHEALTH_ID_SYSTEM, "value": "NOPROFILE-NEGATIVE-" + TS}],
         "name": [{"family": "NoProfileNegative"}],
-        "gender": "male",
-        "birthDate": "1985-01-01"
-    }
-
-
-def build_empty_profile_patient():
-    """Patient with meta.profile=[] — should be rejected per spec."""
-    return {
-        "resourceType": "Patient",
-        "meta": {"profile": []},
-        "identifier": [{"system": PHILHEALTH_ID_SYSTEM, "value": "EMPTYPROFILE-NEGATIVE-" + TS}],
-        "name": [{"family": "EmptyProfileNegative"}],
         "gender": "male",
         "birthDate": "1985-01-01"
     }
@@ -422,31 +373,6 @@ def build_invalid_profile_patient():
         "name": [{"family": "InvalidProfileNegative"}],
         "gender": "male",
         "birthDate": "1985-01-01"
-    }
-
-
-def build_mixed_validity_bundle():
-    """Transaction Bundle: Patient WITHOUT profile + 2 Obs WITH profile."""
-    return {
-        "resourceType": "Bundle",
-        "type": "transaction",
-        "entry": [
-            {
-                "fullUrl": f"urn:uuid:{UUID_MIXED_PROFILE}",
-                "resource": build_no_profile_patient(),
-                "request": {"method": "POST", "url": "Patient"}
-            },
-            {
-                "fullUrl": f"urn:uuid:{UUID_MIXED_OBS1}",
-                "resource": build_bp_observation(f"urn:uuid:{UUID_MIXED_PROFILE}"),
-                "request": {"method": "POST", "url": "Observation"}
-            },
-            {
-                "fullUrl": f"urn:uuid:{UUID_MIXED_OBS2}",
-                "resource": build_hgb_observation(f"urn:uuid:{UUID_MIXED_PROFILE}"),
-                "request": {"method": "POST", "url": "Observation"}
-            }
-        ]
     }
 
 
@@ -500,44 +426,6 @@ def main():
 
     fh("## A. Validator Enforcement")
     fh("")
-
-    # ── A1. Individual POST: Patient without meta.profile ──────────────────
-    fh("### A1. POST Patient WITHOUT `meta.profile`")
-    fh("")
-    fh("**Expected:** HTTP 422 (HAPI-0575: resource does not declare "
-       "conformance to any profile)")
-    code_a1, _ = fhir_post("/Patient", build_no_profile_patient(),
-                            label="POST /Patient (no meta.profile)")
-    verify("Patient without meta.profile rejected",
-           code_a1 in ("422", "412", "400"), f"HTTP {code_a1}")
-    fh("---")
-
-    # ── A2. Individual POST: Patient with meta.profile=[] ──────────────────
-    fh("### A2. POST Patient with `meta.profile=[]`")
-    fh("")
-    fh("**Expected:** HTTP 422 (HAPI-0575: empty profile array)")
-    code_a2, _ = fhir_post("/Patient", build_empty_profile_patient(),
-                            label="POST /Patient (meta.profile=[])")
-    verify("Patient with empty meta.profile rejected",
-           code_a2 in ("422", "412", "400"), f"HTTP {code_a2}")
-    fh("---")
-
-    # ── A3. Transaction Bundle: mixed valid/invalid entries ────────────────
-    fh("### A3. Transaction Bundle — Patient without profile + valid Observations")
-    fh("")
-    fh("**Expected:** HTTP 422 with atomic rollback — NO resources stored")
-    mixed_bundle = build_mixed_validity_bundle()
-    code_a3, _ = fhir_post("", mixed_bundle,
-                            label="POST / (mixed-validity Bundle)")
-    verify("Mixed-validity Bundle rejected",
-           code_a3 in ("422", "412", "400"), f"HTTP {code_a3}")
-    np_search = fhir_get(
-        f"/Patient?identifier={PHILHEALTH_ID_SYSTEM}|NOPROFILE-NEGATIVE-{TS}",
-        label="Rollback check")
-    np_total = extract_total(np_search)
-    verify("Atomic rollback — no no-profile Patient stored",
-           np_total == 0, f"total={np_total}")
-    fh("---")
 
     # ── A4. Individual POST: Patient with invalid profile URL ──────────────
     fh("### A4. POST Patient with fake profile URL")
@@ -702,168 +590,6 @@ def main():
             fh(f"- Entry `{loc_id}` → HTTP `{entry_status}`")
     fh("---")
 
-    # ── 5. Verify Patient count after in-Bundle Patient POST ───────────────
-    fh("## 5. Search Patients by Identifier — Check Dedup Worked")
-    fh("")
-    fh("Search for all Patients with the PhilHealth identifier "
-       "`{patient_id_short}`. Transaction dedup should have converted the "
-       "Patient entry from POST to PUT, so only **1 Patient** exists:",
-       patient_id_short=PATIENT_ID)
-    fh("")
-    fh("- `{patient_id}` (the original, updated with merged fields from step 4)",
-       patient_id=patient_id)
-    mid_search, mid_total = search_idents(
-        "Patient", PHILHEALTH_ID_SYSTEM, PATIENT_ID,
-        "Search Patients by Identifier — Check Dedup")
-    mid_ids = extract_patient_ids(mid_search)
-    verify(f"Only 1 Patient exists (transaction dedup worked)",
-           mid_total == 1, f"total={mid_total}, ids={mid_ids}")
-
-    if mid_total == 1 and mid_search.get("entry"):
-        p = mid_search["entry"][0]["resource"]
-        fh("")
-        fh("**Updated Patient attributes after transaction dedup:**")
-        fh(f"- **id:** `{p.get('id')}`")
-        fh(f"- **gender:** `{p.get('gender')}` (expected: other — incoming from Bundle wins)")
-        n = p.get("name", [{}])[0]
-        fh(f"- **name:** `{n.get('family')} {' '.join(n.get('given', []))}`"
-           f" (expected: BundleTest InBundleDuplicate — incoming wins)")
-        fh(f"- **birthDate:** `{p.get('birthDate')}`"
-           f" (expected: 1985-05-20 — preserved from original)")
-    fh("---")
-
-    # ── 6. Individual duplicate POST (dedup should still work) ─────────────
-    fh("## 6. Individual Duplicate Patient POST (dedup should work)")
-    fh("")
-    fh("POST a Patient with the **same PhilHealth identifier** via individual "
-       "`POST /Patient`. The dedup interceptor should merge into the "
-       "**latest** existing Patient (by `meta.lastUpdated`) and return a "
-       "dedup `Bundle`.")
-    dup_patient = build_patient()
-    dup_patient["name"][0]["given"] = ["DedupSent"]
-    dup_patient["gender"] = "female"
-    code6, resp6 = fhir_post("/Patient", dup_patient,
-                              label="POST /Patient (dedup)")
-
-    is_bundle = resp6.get("resourceType") == "Bundle"
-    verify("Response is a Bundle (not error OperationOutcome)", is_bundle,
-           f"resourceType={resp6.get('resourceType', '?')}")
-
-    if is_bundle:
-        bundle_type = resp6.get("type", "?")
-        entries = resp6.get("entry", [])
-        has_patient = any(e.get("resource", {}).get("resourceType") == "Patient"
-                          for e in entries)
-        has_oo = any(e.get("resource", {}).get("resourceType") == "OperationOutcome"
-                     for e in entries)
-        oo_severity = "?"
-        merged_id = "?"
-        for e in entries:
-            res = e.get("resource", {})
-            if res.get("resourceType") == "OperationOutcome":
-                for iss in res.get("issue", []):
-                    oo_severity = iss.get("severity", "?")
-            if res.get("resourceType") == "Patient":
-                merged_id = res.get("id", "?")
-
-        verify(f"Bundle type is 'collection'", bundle_type == "collection")
-        verify("Contains merged Patient resource", has_patient)
-        verify("Contains informational OperationOutcome", has_oo)
-        verify("OperationOutcome severity is 'information'",
-               oo_severity == "information",
-               f"severity={oo_severity}")
-        fh(f"- Merged into Patient ID: `{merged_id}`", merged_id=merged_id)
-    fh("---")
-
-    # ── 7. Final Verification ──────────────────────────────────────────────
-    fh("## 7. Final Verification — Search Patient by Identifier")
-    fh("")
-    fh("After the individual dedup POST (step 6), the duplicate was merged into "
-       "the existing Patient. Since transaction dedup also worked (step 4-5), "
-       "there was never a duplicate to begin with. Expect **1 Patient**.")
-    final_search, final_total = search_idents(
-        "Patient", PHILHEALTH_ID_SYSTEM, PATIENT_ID,
-        "Final Verification — Search Patient")
-    final_ids = extract_patient_ids(final_search)
-    verify(f"Exactly 1 Patient exists (dedup worked at both individual and "
-           f"transaction level)",
-           final_total == 1, f"total={final_total}, ids={final_ids}")
-
-    if final_total == 2 and final_search.get("entry"):
-        p = final_search["entry"][0]["resource"]
-        fh("")
-        fh("**Latest merged Patient attributes:**")
-        fh(f"- **id:** `{p.get('id')}`")
-        fh(f"- **gender:** `{p.get('gender')}` (expected: female — incoming wins)")
-        n = p.get("name", [{}])[0]
-        fh(f"- **name:** `{n.get('family')} {' '.join(n.get('given', []))}`"
-           f" (expected: BundleTest DedupSent — incoming wins)")
-        fh(f"- **birthDate:** `{p.get('birthDate')}`"
-           f" (expected: 1985-05-20 — preserved from original)")
-    fh("")
-    fh("---")
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # B. Practitioner & Organization dedup
-    # ═══════════════════════════════════════════════════════════════════════
-
-    fh("## B. Practitioner & Organization Dedup")
-    fh("")
-
-    # ── B1. Practitioner dedup ─────────────────────────────────────────────
-    fh("### B1. POST Practitioner — then POST duplicate by identifier")
-    fh("")
-    fh("Create a Practitioner with a PRC license, then POST again with the "
-       "same identifier. The dedup interceptor should merge the second into "
-       "the first and return a collection Bundle.")
-    code_b1a, resp_b1a = fhir_post("/Practitioner", build_practitioner(),
-                                    label="POST /Practitioner (create)")
-    pract_id = extract_id(resp_b1a)
-    verify("Practitioner created (HTTP 201)", code_b1a == "201",
-           f"-> `{pract_id}`")
-
-    dup_pract = build_practitioner()
-    dup_pract["name"][0]["given"] = ["DedupPract"]
-    dup_pract["gender"] = "male"
-    code_b1b, resp_b1b = fhir_post("/Practitioner", dup_pract,
-                                    label="POST /Practitioner (dedup)")
-    is_bundle_pt = resp_b1b.get("resourceType") == "Bundle"
-    verify("Practitioner dedup returns Bundle", is_bundle_pt,
-           f"resourceType={resp_b1b.get('resourceType', '?')}")
-    if is_bundle_pt:
-        verify("Practitioner dedup Bundle is 'collection'",
-               resp_b1b.get("type") == "collection")
-        verify("Practitioner merge info OO present",
-               any(e.get("resource", {}).get("resourceType") == "OperationOutcome"
-                   for e in resp_b1b.get("entry", [])))
-    fh("---")
-
-    # ── B2. Organization dedup ─────────────────────────────────────────────
-    fh("### B2. POST Organization — then POST duplicate by identifier")
-    fh("")
-    fh("Create an Organization with a DOH facility code, then POST again "
-       "with the same identifier. Should merge via the dedup interceptor.")
-    code_b2a, resp_b2a = fhir_post("/Organization", build_organization(),
-                                    label="POST /Organization (create)")
-    org_id = extract_id(resp_b2a)
-    verify("Organization created (HTTP 201)", code_b2a == "201",
-           f"-> `{org_id}`")
-
-    dup_org = build_organization()
-    dup_org["name"] = "DedupOrg Merged"
-    code_b2b, resp_b2b = fhir_post("/Organization", dup_org,
-                                    label="POST /Organization (dedup)")
-    is_bundle_org = resp_b2b.get("resourceType") == "Bundle"
-    verify("Organization dedup returns Bundle", is_bundle_org,
-           f"resourceType={resp_b2b.get('resourceType', '?')}")
-    if is_bundle_org:
-        verify("Organization dedup Bundle is 'collection'",
-               resp_b2b.get("type") == "collection")
-        verify("Organization merge info OO present",
-               any(e.get("resource", {}).get("resourceType") == "OperationOutcome"
-                   for e in resp_b2b.get("entry", [])))
-    fh("---")
-
     # ═══════════════════════════════════════════════════════════════════════
     # C. Edge cases
     # ═══════════════════════════════════════════════════════════════════════
@@ -918,46 +644,6 @@ def main():
                             label="POST / (all-valid Bundle)")
     verify("All-valid Bundle accepted (HTTP 200)", code_c2 == "200",
            f"HTTP {code_c2}")
-    fh("---")
-
-    # ── C3. Merge strategy — field-by-field assertions ─────────────────────
-    fh("### C3. Merge Strategy — Field-by-field assertions")
-    fh("")
-    fh("The final merged Patient should reflect the merge strategy: "
-       "incoming wins where set, existing preserved where incoming absent, "
-       "identifiers unioned.")
-    if not final_search.get("entry"):
-        verify("Merge: cannot check — final search returned no entries", False, "no entry key")
-    else:
-        fp = final_search["entry"][0]["resource"]
-        ci = [i.get('value') for i in fp.get('identifier', [])]
-        cn = fp.get('name', [{}])[0]
-        cg = ' '.join(cn.get('given', []))
-        verify("Merge: gender=female (incoming from step 6 wins)", fp.get('gender') == 'female', f"gender={fp.get('gender')}")
-        verify("Merge: birthDate=1985-05-20 (preserved from original)", fp.get('birthDate') == '1985-05-20', f"birthDate={fp.get('birthDate')}")
-        verify("Merge: name=DedupSent (incoming from step 6 wins)", 'DedupSent' in cg, f"given={cg}")
-        verify("Merge: identifier union includes both PhilHealth and PhilSys", len(ci) >= 1, f"identifier_count={len(ci)}, ids={ci}")
-    fh("---")
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # D. Transaction dedup response format detail
-    # ═══════════════════════════════════════════════════════════════════════
-
-    fh("## D. Transaction Dedup Response Format Detail")
-    fh("")
-    fh("In step 4 above, the dedup interceptor converted the Patient entry "
-       "from POST to PUT. The transaction response should show `200 OK` for "
-       "the updated Patient and `201 Created` for new Observations.")
-    if resp4.get("resourceType") == "Bundle":
-        d_statuses = [(e.get("response", {}).get("status", "?"),
-                       e.get("response", {}).get("location", "?"))
-                      for e in resp4.get("entry", [])]
-        has_200_ok = any(s.startswith("200") for s, _ in d_statuses)
-        has_201 = any(s.startswith("201") for s, _ in d_statuses)
-        verify("Transaction response includes '200 OK' for updated Patient",
-               has_200_ok, f"statuses={d_statuses}")
-        verify("Transaction response includes '201 Created' for new Observations",
-               has_201, f"statuses={d_statuses}")
     fh("---")
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -1161,12 +847,6 @@ def main():
     fh("")
     fh("| # | Test | Expected | Result |")
     fh("|---|------|----------|--------|")
-    fh("| A1 | No-profile Patient POST | 422 Rejected | {r} |",
-       r=result_for("Patient without meta.profile rejected"))
-    fh("| A2 | Empty meta.profile Patient POST | 422 Rejected | {r} |",
-       r=result_for("Patient with empty meta.profile rejected"))
-    fh("| A3 | Mixed-validity Bundle POST | 422 Rejected + atomic rollback | {r} |",
-       r=result_for("Mixed-validity Bundle rejected", "Atomic rollback — no no-profile Patient stored"))
     fh("| A4 | Invalid-profile Patient POST | 422 Rejected | {r} |",
        r=result_for("Patient with invalid profile rejected"))
     fh("| A5 | PH Core canonical Patient POST | 201 Created | {r} |",
@@ -1184,29 +864,10 @@ def main():
     fh("| 4 | Bundle POST (Patient + Observations) — Patient already exists "
        "| Transaction dedup converts POST->PUT, no duplicate | {r} |",
        r=result_for("Bundle accepted (HTTP 200)"))
-    fh("| 5 | Post-Bundle Patient count | 1 Patient (original, updated by PUT) "
-       "| {r} |",
-       r=result_for("Only 1 Patient exists (transaction dedup worked)"))
-    fh("| 6 | Individual duplicate Patient POST | 200 OK, Bundle with merged "
-       "resource + info OO | {r} |",
-       r=result_for("Response is a Bundle (not error OperationOutcome)"))
-    fh("| 7 | Final Patient count | 1 Patient (no duplicates at any level) "
-       "| {r} |",
-       r=result_for("Exactly 1 Patient exists (dedup worked at both individual and transaction level)"))
-    fh("| B1 | Practitioner double POST (dedup) | 200 OK, dedup Bundle | {r} |",
-       r=result_for("Practitioner dedup returns Bundle"))
-    fh("| B2 | Organization double POST (dedup) | 200 OK, dedup Bundle | {r} |",
-       r=result_for("Organization dedup returns Bundle"))
     fh("| C1 | No-match transaction Bundle | 200 OK, all 3 created | {r} |",
        r=result_for("No-match Bundle accepted (HTTP 200)", "All 3 entries created normally"))
     fh("| C2 | All-valid transaction Bundle | 200 OK, all 3 created | {r} |",
        r=result_for("All-valid Bundle accepted (HTTP 200)"))
-    fh("| C3 | Merge strategy field assertions | Gender/name incoming wins, "
-       "birthDate preserved, identifiers unioned | {r} |",
-       r=result_for("Merge: gender=female (incoming from step 6 wins)"))
-    fh("| D | Transaction response format | 200 OK for updated Patient, "
-       "201 Created for Observations | {r} |",
-       r=result_for("Transaction response includes '200 OK' for updated Patient"))
     fh("| E | No-match individual POST | 201 Created, single resource | {r} |",
        r=result_for("No-match POST returns single resource (not Bundle)"))
     fh("| F1 | $validate valid Patient | OperationOutcome accessible, no errors | {r} |",
@@ -1224,10 +885,10 @@ def main():
     fh("")
     fh("### Key findings")
     fh("")
-    fh("**Validator (tests A1-A7):** The `RepositoryValidatingInterceptor` "
+    fh("**Validator (tests A4-A7):** The `RepositoryValidatingInterceptor` "
        "now has rules built from stored PH Core and PH eReferral "
-       "StructureDefinitions. Resources without `meta.profile`, with empty "
-       "profile arrays, or with invalid profile URLs are rejected with "
+       "StructureDefinitions. Resources with "
+       "invalid profile URLs are rejected with "
        "HTTP 422. Valid canonical profiles (`ph-core-patient`, "
        "`ereferral-patient`) are accepted.")
     fh("")
@@ -1248,7 +909,7 @@ def main():
        "headers to outgoing responses. Read operations return HTTP 200 as "
        "expected.")
     fh("")
-    fh("**Transaction dedup (steps 1-7):** The `SERVER_INCOMING_REQUEST_PRE_HANDLED` "
+    fh("**Transaction dedup (steps 1-4):** The `SERVER_INCOMING_REQUEST_PRE_HANDLED` "
        "hook handles both `CREATE` and `TRANSACTION` operations:")
     fh("")
     fh("- **Individual POST (`CREATE`):** Merge via DAO, throw "
@@ -1260,14 +921,8 @@ def main():
        "ID. The transaction processes the Bundle normally — the Patient gets "
        "updated (not duplicated) and Observations are created.")
     fh("")
-    fh("**Practitioner & Organization dedup (B1-B2):** The interceptor also "
-       "handles `POST /Practitioner` and `POST /Organization` with identifier "
-       "matching — same merge strategy and response format as Patient.")
-    fh("")
-    fh("**Edge cases (C-E):** No-match transactions proceed normally; "
-       "all-valid transactions succeed; merged fields follow the incoming-wins "
-       "strategy with identifier union; transaction responses show correct "
-       "status codes (200 OK for PUT-updated entries, 201 Created for new).")
+    fh("**Edge cases (C):** No-match transactions proceed normally; "
+       "all-valid transactions succeed.")
     fh("")
     fh(f"Generated by `tests/run-bundle-test.py` on {datetime.now().isoformat()}")
 

@@ -11,7 +11,7 @@ set -u
 #   KEEP_CREATED=false bash generate_eref_testing_report_v2.sh http://localhost:8081/fhir
 #   SERVICE_REQUEST_PROFILE_URL="https://fhir.doh.gov.ph/pheref/StructureDefinition/<profile>" bash generate_eref_testing_report_v2.sh
 
-BASE_URL="${1:-http://localhost:8081/fhir}"
+BASE_URL="${1:-http://localhost:8080/fhir}"
 EREF_PATIENT_PROFILE_URL="${EREF_PATIENT_PROFILE_URL:-https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-patient}"
 EREF_PRIORITY_VS_URL="${EREF_PRIORITY_VS_URL:-https://fhir.doh.gov.ph/pheref/ValueSet/ereferral-priority}"
 EREF_WORKFLOW_CS_URL="${EREF_WORKFLOW_CS_URL:-https://fhir.doh.gov.ph/pheref/CodeSystem/ereferral-workflow}"

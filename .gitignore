@@ -1,1 +1,3 @@
 eref-testing-results-*/
+tests/__pycache__/run-bundle-test.cpython-*.pyc
+tests/bundle-transaction-test-*.md
