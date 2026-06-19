@@ -1,1 +1,0 @@
-docker build --tag hapiproject/hapi:latest --tag hapiproject/hapi:8.6.1 -m 4g .
