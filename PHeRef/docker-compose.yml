@@ -14,7 +14,7 @@ services:
 
   eref-hapi:
     build: .
-    image: hapi-custom:latest
+    image: "hapiproject/hapi:v8.10.0-1"
     container_name: eref-hapi
     restart: unless-stopped
     depends_on:

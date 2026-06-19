@@ -44,7 +44,9 @@ hapi:
       # the pre-merge (stale) incoming resource before dedup runs, breaking the flow.
       # The $validate FHIR operation endpoint is always available and not gated here.
       requests_enabled: true
-      responses_enabled: false
+      # Guarantees validity on Response (Internally Validated)
+      responses_enabled: false # When it hits the server in | Validation Waterfalls down and therefore it can change as a result
+
     subscription:
       resthook_enabled: true
       websocket_enabled: false
@@ -59,6 +61,15 @@ hapi:
         installMode: STORE_AND_INSTALL
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-Core/package.tgz
         fetchDependencies: false
+        installResourceTypes:
+          - StructureDefinition
+          - SearchParameter
+          - NamingSystem
+          - Subscription
+          # So that the passthrough validation will go to Ontoserver
+          # Caveat. Longer Ping Pong validation 
+          # - CodeSystem
+          # - ValueSets
 
       ph_eref:
         name: fhir.ph.ereferral
@@ -67,6 +78,18 @@ hapi:
         installMode: STORE_AND_INSTALL
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-eReferral/package.tgz
         fetchDependencies: true
+        ## Rationale: so that the preference of the Terminologies will be from tx.fhirlab.net
+        ## Not from the Implementation Guide Example 
+        installResourceTypes:
+          - StructureDefinition
+          - SearchParameter
+          - NamingSystem
+          - Subscription
+          # So that the passthrough validation will go to Ontoserver
+          # Caveat. Longer Ping Pong validation 
+          # - CodeSystem
+          # - ValueSets
+
         dependencyExcludes:
           - "hl7.fhir.uv.extensions"
           - "hl7.fhir.uv.extensions.r4"
