@@ -53,6 +53,12 @@ hapi:
       email_enabled: false
     openapi_enabled: false
 
+    logger:
+      name: fhirtest.access
+      format: "verb=${requestVerb} path=${servletPath} op=${operationType} opName=${operationName} resource=${idOrResourceName} remoteAddr=${remoteAddr} forwardedFor=${requestHeader.x-forwarded-for} userAgent=${requestHeader.user-agent} requestId=${requestId} params=${requestParameters} processingMs=${processingTimeMillis}"
+      error_format: "verb=${requestVerb} path=${requestUrl} op=${operationType} resource=${idOrResourceName} remoteAddr=${remoteAddr} requestId=${requestId} error=${exceptionMessage}"
+      log_exceptions: true
+
     implementationguides:
       ph_core:
         name: fhir.ph.core
