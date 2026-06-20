@@ -1,6 +1,6 @@
 spring:
   main:
-    allow-circular-references: truedoc
+    allow-circular-references: true
   datasource:
     url: jdbc:postgresql://db:5432/hapi
     username: admin
@@ -23,8 +23,8 @@ hapi:
     fhir_version: R4
     tester:
       home:
-        name: PH eReferral FHIR Server
-        server_address: 'http://localhost:8080/fhir' #change this with our own server
+        name: PH Core FHIR Server
+        server_address: 'http://localhost:8080/fhir'
         refuse_to_fetch_third_party_urls: false
         fhir_version: R4
 
@@ -33,18 +33,13 @@ hapi:
     mdm_config_json: file:/app/config/mdm-rules.json
     validate_resource_status_for_package_upload: false
 
-    enable_repository_validating_interceptor: true
+    enable_repository_validating_interceptor: false
     enforce_referential_integrity_on_write: true
 
     validation:
-      # requests_enabled MUST remain false. The RequestValidatingInterceptor
-      # (old-style IServerInterceptor) fires at SERVER_INCOMING_REQUEST_POST_PROCESSED,
-      # which HAPI invokes BEFORE @Hook(SERVER_INCOMING_REQUEST_PRE_HANDLED) — the
-      # pointcut used by PhCoreDeduplicationInterceptor. Enabling this would validate
-      # the pre-merge (stale) incoming resource before dedup runs, breaking the flow.
-      # The $validate FHIR operation endpoint is always available and not gated here.
       requests_enabled: true
       responses_enabled: false
+
     subscription:
       resthook_enabled: true
       websocket_enabled: false
@@ -58,13 +53,12 @@ hapi:
         reloadExisting: false
         installMode: STORE_AND_INSTALL
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-Core/package.tgz
-        fetchDependencies: true
-        dependencyExcludes:
-          - "hl7.fhir.uv.extensions"
-          - "hl7.fhir.uv.extensions.r4"
-          - hl7.fhir.uv.extensions.r5
-          - "hl7.terminology.r5"
-          - "fhir.ph.core"
+        fetchDependencies: false
+        installResourceTypes:
+          - StructureDefinition
+          - SearchParameter
+          - NamingSystem
+          - Subscription
       hl7_extensions_r4:
         name: hl7.fhir.uv.extensions.r4
         version: 5.3.0
@@ -75,8 +69,18 @@ hapi:
           - StructureDefinition
           - SearchParameter
         dependencyExcludes:
-           - "hl7.terminology.r5"
-           - "hl7.terminology.r4"
+          - "hl7.terminology.r5"
+          - "hl7.terminology.r4"
+      hl7_terminology_r4:
+        name: hl7.terminology.r4
+        version: 6.2.0
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: false
+        installResourceTypes:
+          - CodeSystem
+          - ValueSet
+
     logical_urls:
       - http://terminology.hl7.org/*
       - https://terminology.hl7.org/*
@@ -87,6 +91,15 @@ hapi:
       - http://loinc.org/*
       - https://loinc.org/*
     remote_terminology_service:
+      loinc:
+        system: "http://loinc.org"
+        url: "https://tx.fhirlab.net/fhir"
+      snomed:
+        system: "http://snomed.info/sct"
+        url: "https://tx.fhirlab.net/fhir"
+      ucum:
+        system: "http://unitsofmeasure.org"
+        url: "https://tx.fhir.org/r4"
       all:
         system: '*'
         url: 'https://tx.fhirlab.net/fhir'
