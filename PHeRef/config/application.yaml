@@ -37,15 +37,8 @@ hapi:
     enforce_referential_integrity_on_write: true
 
     validation:
-      # requests_enabled MUST remain false. The RequestValidatingInterceptor
-      # (old-style IServerInterceptor) fires at SERVER_INCOMING_REQUEST_POST_PROCESSED,
-      # which HAPI invokes BEFORE @Hook(SERVER_INCOMING_REQUEST_PRE_HANDLED) — the
-      # pointcut used by PhCoreDeduplicationInterceptor. Enabling this would validate
-      # the pre-merge (stale) incoming resource before dedup runs, breaking the flow.
-      # The $validate FHIR operation endpoint is always available and not gated here.
       requests_enabled: true
-      # Guarantees validity on Response (Internally Validated)
-      responses_enabled: false # When it hits the server in | Validation Waterfalls down and therefore it can change as a result
+      responses_enabled: false
 
     subscription:
       resthook_enabled: true
@@ -72,9 +65,8 @@ hapi:
           - SearchParameter
           - NamingSystem
           - Subscription
-          - ImplementationGuide
           # So that the passthrough validation will go to Ontoserver
-          # Caveat. Longer Ping Pong validation 
+          # Caveat. Longer Ping Pong validation
           # - CodeSystem
           # - ValueSets
 
@@ -86,13 +78,12 @@ hapi:
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-eReferral/package.tgz
         fetchDependencies: true
         ## Rationale: so that the preference of the Terminologies will be from tx.fhirlab.net
-        ## Not from the Implementation Guide Example 
+        ## Not from the Implementation Guide Example
         installResourceTypes:
           - StructureDefinition
           - SearchParameter
           - NamingSystem
           - Subscription
-          - ImplementationGuide # Not sure if needed
           # So that the passthrough validation will go to Ontoserver
           # Caveat. Longer Ping Pong validation 
           # - CodeSystem
@@ -111,12 +102,20 @@ hapi:
         installMode: STORE_AND_INSTALL
         fetchDependencies: true
         installResourceTypes:
-          - ImplementationGuide
           - StructureDefinition
           - SearchParameter
         dependencyExcludes:
            - "hl7.terminology.r5"
            - "hl7.terminology.r4"
+      hl7_terminology_r4:
+        name: hl7.terminology.r4
+        version: 6.2.0
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: false
+        installResourceTypes:
+          - CodeSystem
+          - ValueSet
     logical_urls:
       - http://terminology.hl7.org/*
       - https://terminology.hl7.org/*
@@ -153,3 +152,6 @@ hapi:
       psoc-unit:
         system: "https://psa.gov.ph/classification/psoc/unit"
         url: "https://tx.fhirlab.net/fhir"
+      all:
+        system: '*'
+        url: 'https://tx.fhirlab.net/fhir'
