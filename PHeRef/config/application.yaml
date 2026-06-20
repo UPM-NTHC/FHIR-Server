@@ -33,7 +33,7 @@ hapi:
     mdm_config_json: file:/app/config/mdm-rules.json
     validate_resource_status_for_package_upload: false
 
-    enable_repository_validating_interceptor: true
+    enable_repository_validating_interceptor: false
     enforce_referential_integrity_on_write: true
 
     validation:
