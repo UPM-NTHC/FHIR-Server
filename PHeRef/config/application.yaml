@@ -1,6 +1,14 @@
 spring:
+  # Flyway: Database migration tool. HAPI FHIR JPA uses Flyway to manage
+  # versioned schema migrations. However, Hibernate's hbm2ddl.auto=update
+  # already handles schema creation/evolution for HAPI. Additionally, Flyway
+  # Community Edition 10.x does NOT support PostgreSQL ≥15 (requires Teams/
+  # Enterprise license). Disabling Flyway is safe here since Hibernate handles
+  # schema management. See: hapifhir/hapi-fhir-jpaserver-starter#694
+  flyway:
+    enabled: false
   main:
-    allow-circular-references: truedoc
+    allow-circular-references: true
   datasource:
     url: jdbc:postgresql://db:5432/hapi
     username: admin
