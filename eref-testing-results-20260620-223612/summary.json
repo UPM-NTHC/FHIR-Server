@@ -1,0 +1,163 @@
+{
+  "status": "completed",
+  "baseUrl": "https://cdr.phcore.fhirlab.net/fhir",
+  "erefPatientProfileUrl": "https://fhir.doh.gov.ph/pheref/StructureDefinition/ereferral-patient",
+  "erefPriorityValueSetUrl": "https://fhir.doh.gov.ph/pheref/ValueSet/ereferral-priority",
+  "erefWorkflowCodeSystemUrl": "https://fhir.doh.gov.ph/pheref/CodeSystem/ereferral-workflow",
+  "serviceRequestProfileUrl": "",
+  "keepCreated": "true",
+  "criticalTitle": "eReferral Patient profile is not loaded",
+  "testsRun": 15,
+  "tests": [
+    {
+      "num": 1,
+      "name": "Metadata",
+      "endpoint": "GET /metadata",
+      "http": "200",
+      "expected": "CapabilityStatement",
+      "actual": "HAPI FHIR Server 4.0.1",
+      "finding": "✅ Server reachable",
+      "log": "logs/01-metadata.json"
+    },
+    {
+      "num": 2,
+      "name": "ImplementationGuide list",
+      "endpoint": "GET /ImplementationGuide",
+      "http": "200",
+      "expected": "IG resources visible",
+      "actual": "total=0",
+      "finding": "⚠️ No IG resources listed",
+      "log": "logs/02-implementationguide-list.json"
+    },
+    {
+      "num": 3,
+      "name": "eReferral Patient profile",
+      "endpoint": "GET /StructureDefinition?url=...",
+      "http": "200",
+      "expected": "Profile found",
+      "actual": "total=0",
+      "finding": "❌ Profile not found",
+      "log": "logs/03-eref-patient-profile-search.json"
+    },
+    {
+      "num": 4,
+      "name": "eReferral priority ValueSet",
+      "endpoint": "GET /ValueSet?url=...",
+      "http": "200",
+      "expected": "ValueSet found",
+      "actual": "total=0",
+      "finding": "⚠️ ValueSet not found",
+      "log": "logs/04-eref-priority-valueset-search.json"
+    },
+    {
+      "num": 5,
+      "name": "eReferral workflow CodeSystem",
+      "endpoint": "GET /CodeSystem?url=...",
+      "http": "200",
+      "expected": "CodeSystem found",
+      "actual": "total=0",
+      "finding": "⚠️ CodeSystem not found",
+      "log": "logs/05-eref-workflow-codesystem-search.json"
+    },
+    {
+      "num": 6,
+      "name": "Validate valid eReferral Patient",
+      "endpoint": "POST /Patient/$validate",
+      "http": "422",
+      "expected": "0 errors",
+      "actual": "errors=2 warnings=0",
+      "finding": "❌ Review OperationOutcome",
+      "log": "logs/06-validate-eref-patient-valid.json"
+    },
+    {
+      "num": 7,
+      "name": "Validate invalid eReferral Patient",
+      "endpoint": "POST /Patient/$validate",
+      "http": "422",
+      "expected": "Should return errors",
+      "actual": "errors=2 warnings=1",
+      "finding": "✅ Invalid patient detected",
+      "log": "logs/07-validate-eref-patient-invalid.json"
+    },
+    {
+      "num": 8,
+      "name": "Create Patient without profile",
+      "endpoint": "POST /Patient",
+      "http": "201",
+      "expected": "Blocked if interceptor requires profile",
+      "actual": "Patient/15659",
+      "finding": "⚠️ Accepted without profile",
+      "log": "logs/08-create-patient-no-profile.json"
+    },
+    {
+      "num": 9,
+      "name": "Create eReferral Patient",
+      "endpoint": "POST /Patient",
+      "http": "422",
+      "expected": "Created",
+      "actual": "Patient/not-created",
+      "finding": "❌ Failed",
+      "log": "logs/09-create-eref-patient.json"
+    },
+    {
+      "num": 10,
+      "name": "Create referring Organization",
+      "endpoint": "POST /Organization",
+      "http": "201",
+      "expected": "Created",
+      "actual": "Organization/15660",
+      "finding": "✅ Created",
+      "log": "logs/10-create-referring-organization.json"
+    },
+    {
+      "num": 11,
+      "name": "Create receiving Organization",
+      "endpoint": "POST /Organization",
+      "http": "201",
+      "expected": "Created",
+      "actual": "Organization/15661",
+      "finding": "✅ Created",
+      "log": "logs/11-create-receiving-organization.json"
+    },
+    {
+      "num": 12,
+      "name": "Create Practitioner",
+      "endpoint": "POST /Practitioner",
+      "http": "201",
+      "expected": "Created",
+      "actual": "Practitioner/15662",
+      "finding": "✅ Created",
+      "log": "logs/12-create-practitioner.json"
+    },
+    {
+      "num": 13,
+      "name": "Create referral ServiceRequest",
+      "endpoint": "POST /ServiceRequest",
+      "http": "SKIPPED",
+      "expected": "Created",
+      "actual": "ServiceRequest/not-created",
+      "finding": "❌ Failed or skipped",
+      "log": "logs/13-create-servicerequest-referral.json"
+    },
+    {
+      "num": 14,
+      "name": "Search Patient by identifier",
+      "endpoint": "GET /Patient?identifier=...",
+      "http": "200",
+      "expected": "total >= 1",
+      "actual": "total=0",
+      "finding": "⚠️ Patient not found",
+      "log": "logs/14-search-patient-by-identifier.json"
+    },
+    {
+      "num": 15,
+      "name": "Search ServiceRequest by Patient",
+      "endpoint": "GET /ServiceRequest?subject=Patient/...",
+      "http": "SKIPPED",
+      "expected": "total >= 1",
+      "actual": "total=0",
+      "finding": "⚠️ Referral not found",
+      "log": "logs/15-search-servicerequest-by-subject.json"
+    }
+  ]
+}
