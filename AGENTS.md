@@ -110,6 +110,7 @@ python3 tests/test_phcore.py --base-url https://fhirportal.telehealth.ph/phcore/
 ### Notes
 
 - PH Core examples use `ResourceType/ID` references (no `urn:uuid` placeholders). The bundle handles circular dependencies (Condition ↔ Encounter). Standalone resources may fail in a server that resolves all references eagerly — this is expected and captured in the report.
+- `Organization/organization-pgh-example` and `Practitioner/practitioner-ed-example` are **excluded** from the test set — they contain PSGC codes (`1339000003`) not found in any tested terminology service. Their dependents (Patient/patient-acs, Encounter/encounter-ed, PractitionerRole/practitionerrole-ed) still reference them but pass because HAPI FHIR accepts dangling references on PUT. Adding PSGC support to the terminology service would allow restoring these files.
 - `.env` keys for PH Core: `PH_CORE_SERVER_ADDRESS`, `PH_CORE_SERVER_PORT`
 
 ## Reports (common)
