@@ -58,3 +58,45 @@ Consider `gh cli` to navigate.
 ### GitHub repos (use `gh` CLI or raw.githubusercontent.com)
 - HAPI FHIR core: `hapifhir/hapi-fhir`
 - HAPI JPA starter: `hapifhir/hapi-fhir-jpaserver-starter`
+
+## Example Resource Tests
+
+### Location
+
+Test script lives at the **repo root** `tests/test_examples.py` (moved from `PHeRef/tests/`).
+
+All resources (examples, reports, config) remain under `PHeRef/`.
+
+### Run tests against FHIR server
+
+```bash
+# From repo root — uses .env (PHEREF_SERVER_ADDRESS + PHEREF_SERVER_PORT) by default
+python3 tests/test_examples.py
+
+# From repo root — specify any target server
+python3 tests/test_examples.py --base-url http://localhost:8080/fhir
+python3 tests/test_examples.py --base-url https://cdr.pheref.fhirlab.net/fhir
+python3 tests/test_examples.py --base-url https://fhirportal.telehealth.ph/PHeRef/fhir
+
+# From inside PHeRef/ — one level deeper
+cd PHeRef
+python3 ../tests/test_examples.py
+```
+
+### What it does
+
+- Loads 32 example FHIR resources from `PHeRef/testdata/examples/`
+- **Phase 1** (Bundle): `POST` the transaction Bundle — resolves all `urn:uuid` cross-references to real resource IDs
+- **Phase 2** (individual): `PUT` each resource with resolved references — verifies every resource is independently loadable
+- Falls back to dry-run (JSON structure validation only) if server is unreachable
+- Generates a domain-labeled markdown report
+
+### Reports
+
+- Output: `PHeRef/reports/test-report-{domain}-{timestamp}.md`
+  - e.g. `test-report-localhost-2026-06-21T021210Z.md`
+  - e.g. `test-report-cdr.pheref.fhirlab.net-2026-06-21T021236Z.md`
+  - e.g. `test-report-fhirportal.telehealth.ph-2026-06-21T021218Z.md`
+- Reports include categorized error narratives with root cause explanations
+- Report directory (`PHeRef/reports/`) is gitignored — local only
+- Comparison report: `PHeRef/reports/comparison.md` (manual, generated per-session)
