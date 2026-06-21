@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""PH eReferral Example Resource Tests.
+"""PH Core Example Resource Tests.
 
 POSTs the transaction bundle and PUTs each individual example to a FHIR server.
-Generates a timestamped markdown report in ../reports/.
+Generates a timestamped markdown report in PHeRef/reports/.
 
 Usage:
-    python tests/test_examples.py
-    python tests/test_examples.py --base-url http://localhost:8080/fhir
-    python tests/test_examples.py --base-url http://localhost:8080/fhir --examples-dir testdata/examples
+    python tests/test_phcore.py
+    python tests/test_phcore.py --base-url http://localhost:8080/fhir
+    python tests/test_phcore.py --base-url http://localhost:8080/fhir --examples-dir testdata/ph-core-examples
 """
 
 import json, os, sys, glob, time, argparse
@@ -18,8 +18,8 @@ from urllib.parse import urlparse
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent / "PHeRef"
 
-DEFAULT_EXAMPLES_DIR = str(PROJECT_DIR / "testdata" / "examples")
-DEFAULT_REPORT_DIR = str(PROJECT_DIR / "reports")
+DEFAULT_EXAMPLES_DIR = str(PROJECT_DIR / "testdata" / "ph-core-examples")
+DEFAULT_REPORT_DIR = str(SCRIPT_DIR.parent / "reports")
 DEFAULT_TIMEOUT = 120
 
 
@@ -36,9 +36,9 @@ def load_env_base_url(env_path: Path) -> str | None:
             continue
         key, _, val = line.partition("=")
         key, val = key.strip(), val.strip().strip("\"'")
-        if key == "PHEREF_SERVER_ADDRESS":
+        if key == "PH_CORE_SERVER_ADDRESS":
             addr = val.rstrip("/")
-        elif key == "PHEREF_SERVER_PORT":
+        elif key == "PH_CORE_SERVER_PORT":
             port = val
     if addr and port:
         return f"{addr}:{port}/fhir"
@@ -61,7 +61,7 @@ def extract_domain_label(base_url: str) -> str:
 
     Examples:
       http://localhost:8080/fhir      -> localhost
-      https://cdr.pheref.fhirlab.net  -> cdr.pheref.fhirlab.net
+      https://cdr.phcore.fhirlab.net   -> cdr.phcore.fhirlab.net
       https://fhirportal.telehealth.ph -> fhirportal.telehealth.ph
     """
     host = urlparse(base_url).hostname or "unknown"
@@ -286,27 +286,32 @@ ERROR_CATEGORIES = {
     "terminology": {
         "label": "Terminology / Code Validation",
         "patterns": ["Unable to validate code", "Unknown code", "Code is not found", "CodeSystem"],
-        "narrative": "The server could not validate terminology codes (SNOMED, LOINC, UCUM, etc.) against its terminology server. This typically means the remote terminology service lacks the required CodeSystem or version.",
+        "narrative": "The server could not validate terminology codes (SNOMED, LOINC, UCUM, etc.) against its terminology server.",
     },
     "urn_uuid_ref": {
         "label": "Unresolved Bundle-Scoped Reference (urn:uuid)",
         "patterns": ["urn:uuid", "Invalid resource reference", "Does not contain resource type"],
-        "narrative": "The resource references a Bundle-scoped temporary identifier (urn:uuid) that could not be resolved. This happens when resources are loaded individually instead of through a transaction Bundle.",
+        "narrative": "The resource references a Bundle-scoped temporary identifier (urn:uuid) that could not be resolved.",
     },
     "missing_prereq": {
         "label": "Missing Prerequisite Resource",
         "patterns": ["not found, specified in path"],
-        "narrative": "A resource references another resource that does not exist on the server. Resources must be loaded in dependency order (standalone resources first, then referencing resources).",
+        "narrative": "A resource references another resource that does not exist on the server.",
+    },
+    "missing_profile": {
+        "label": "Missing Profile / StructureDefinition",
+        "patterns": ["could not be found", "Failed to retrieve profile", "Profile reference"],
+        "narrative": "The server lacks the required StructureDefinition profile for validation.",
     },
     "endpoint_404": {
         "label": "Endpoint Not Found (404)",
         "patterns": ["404"],
-        "narrative": "The server returned HTTP 404, indicating the FHIR endpoint path is incorrect or the server does not support the requested resource type.",
+        "narrative": "The server returned HTTP 404, indicating the FHIR endpoint path is incorrect.",
     },
     "timeout": {
         "label": "Request Timeout",
         "patterns": ["timed out", "Read timed out", "Timeout"],
-        "narrative": "The server did not respond within the configured timeout. This may indicate slow performance, high load, or a blocking operation.",
+        "narrative": "The server did not respond within the configured timeout.",
     },
 }
 
@@ -419,7 +424,7 @@ def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, 
     failed = [r for r in results if not r.success]
 
     lines = [
-        f"# PH eReferral Example Test Report",
+        f"# PH Core Example Test Report",
         f"",
         f"- **Date:** {timestamp}",
         f"- **Server:** `{base_url}`",
@@ -453,7 +458,7 @@ def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, 
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="PH eReferral example resource tests.")
+    parser = argparse.ArgumentParser(description="PH Core example resource tests. Uses PHeRef/testdata/ph-core-examples/.")
     parser.add_argument("--base-url", help="FHIR server base URL (overrides .env)")
     parser.add_argument("--examples-dir", default=DEFAULT_EXAMPLES_DIR, help=f"Example JSONs directory (default: {DEFAULT_EXAMPLES_DIR})")
     parser.add_argument("--report-dir", default=DEFAULT_REPORT_DIR, help=f"Report output directory (default: {DEFAULT_REPORT_DIR})")
@@ -465,7 +470,7 @@ def main():
     report_dir = args.report_dir
     timeout = args.timeout
 
-    print(f"PH eReferral Example Tests")
+    print(f"PH Core Example Tests")
     print(f"{'=' * 60}")
 
     example_files = sorted(glob.glob(os.path.join(examples_dir, "*.json")))
@@ -543,7 +548,7 @@ def main():
     domain_label = extract_domain_label(base_url)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     os.makedirs(report_dir, exist_ok=True)
-    report_path = os.path.join(report_dir, f"test-report-{domain_label}-{ts}.md")
+    report_path = os.path.join(report_dir, f"test-report-phcore-{domain_label}-{ts}.md")
     with open(report_path, "w") as f:
         f.write(generate_markdown(results, ts, base_url, server_up, total_wall_time))
     print(f"\nReport saved: {report_path}")

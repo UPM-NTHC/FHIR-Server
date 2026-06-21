@@ -59,44 +59,72 @@ Consider `gh cli` to navigate.
 - HAPI FHIR core: `hapifhir/hapi-fhir`
 - HAPI JPA starter: `hapifhir/hapi-fhir-jpaserver-starter`
 
-## Example Resource Tests
+## Example Resource Tests (PH eReferral)
 
-### Location
+### Script
 
-Test script lives at the **repo root** `tests/test_examples.py` (moved from `PHeRef/tests/`).
+`tests/test_phereferral.py` — tests PHeRef examples against PHeRef-capable servers.
 
-All resources (examples, reports, config) remain under `PHeRef/`.
-
-### Run tests against FHIR server
+### Run
 
 ```bash
-# From repo root — uses .env (PHEREF_SERVER_ADDRESS + PHEREF_SERVER_PORT) by default
-python3 tests/test_examples.py
-
-# From repo root — specify any target server
-python3 tests/test_examples.py --base-url http://localhost:8080/fhir
-python3 tests/test_examples.py --base-url https://cdr.pheref.fhirlab.net/fhir
-python3 tests/test_examples.py --base-url https://fhirportal.telehealth.ph/PHeRef/fhir
-
-# From inside PHeRef/ — one level deeper
-cd PHeRef
-python3 ../tests/test_examples.py
+# From repo root
+python3 tests/test_phereferral.py
+python3 tests/test_phereferral.py --base-url http://localhost:8080/fhir
+python3 tests/test_phereferral.py --base-url https://cdr.pheref.fhirlab.net/fhir
+python3 tests/test_phereferral.py --base-url https://fhirportal.telehealth.ph/PHeRef/fhir
 ```
 
 ### What it does
 
 - Loads 32 example FHIR resources from `PHeRef/testdata/examples/`
 - **Phase 1** (Bundle): `POST` the transaction Bundle — resolves all `urn:uuid` cross-references to real resource IDs
-- **Phase 2** (individual): `PUT` each resource with resolved references — verifies every resource is independently loadable
-- Falls back to dry-run (JSON structure validation only) if server is unreachable
-- Generates a domain-labeled markdown report
+- **Phase 2** (individual): `PUT` each resource with resolved references
+- Falls back to dry-run (JSON validation only) if server unreachable
+- Report: `reports/test-report-pheref-{domain}-{timestamp}.md`
 
-### Reports
+## Example Resource Tests (PH Core)
 
-- Output: `PHeRef/reports/test-report-{domain}-{timestamp}.md`
-  - e.g. `test-report-localhost-2026-06-21T021210Z.md`
-  - e.g. `test-report-cdr.pheref.fhirlab.net-2026-06-21T021236Z.md`
-  - e.g. `test-report-fhirportal.telehealth.ph-2026-06-21T021218Z.md`
-- Reports include categorized error narratives with root cause explanations
-- Report directory (`PHeRef/reports/`) is gitignored — local only
-- Comparison report: `PHeRef/reports/comparison.md` (manual, generated per-session)
+### Script
+
+`tests/test_phcore.py` — tests PH Core examples against PH Core-capable servers.
+
+### Run
+
+```bash
+# From repo root
+python3 tests/test_phcore.py
+python3 tests/test_phcore.py --base-url http://localhost:8080/fhir
+python3 tests/test_phcore.py --base-url https://cdr.phcore.fhirlab.net/fhir
+python3 tests/test_phcore.py --base-url https://fhirportal.telehealth.ph/phcore/fhir
+```
+
+### What it does
+
+- Loads 45 example FHIR resources from `PHeRef/testdata/ph-core-examples/` (sourced from PH Core IG build)
+- **Phase 1** (Bundle): `POST` the transaction Bundles (ACS case + Single transaction) — creates core resources atomically
+- **Phase 2** (individual): `PUT` each resource independently
+- Falls back to dry-run (JSON validation only) if server unreachable
+- Report: `reports/test-report-phcore-{domain}-{timestamp}.md`
+
+### Notes
+
+- PH Core examples use `ResourceType/ID` references (no `urn:uuid` placeholders). The bundle handles circular dependencies (Condition ↔ Encounter). Standalone resources may fail in a server that resolves all references eagerly — this is expected and captured in the report.
+- `.env` keys for PH Core: `PH_CORE_SERVER_ADDRESS`, `PH_CORE_SERVER_PORT`
+
+## Reports (common)
+
+- Reports output to `reports/` (repo root, gitignored)
+- Categorized error narratives with root cause explanations
+- Comparison report: `reports/comparison.md` (manual, generated per-session)
+
+## Run All Tests (batch)
+
+```bash
+# Interactive — prompts before clearing reports (default N, 5s timeout)
+./tests/run_all_tests.sh
+```
+
+Runs all 6 test combos sequentially:
+- `test_phereferral.py` → localhost, cdr.pheref, fhirportal/PHeRef
+- `test_phcore.py`     → localhost, cdr.phcore, fhirportal/phcore
