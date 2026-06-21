@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """PH Core Example Resource Tests.
 
-POSTs the transaction bundle and PUTs each individual example to a FHIR server.
-Generates a timestamped markdown report in PHeRef/reports/.
+POSTs inline Bundles for circular dependencies (Condition ↔ Encounter),
+then PUTs each resource in dependency order. Generates a timestamped
+markdown report in reports/.
+
+Loading strategy:
+  1. POST inline Bundles for circular dependency groups detected via
+     Tarjan's SCC algorithm (e.g. Condition ↔ Encounter pairs)
+  2. PUT remaining resources in topological dependency order:
+     root resources first, then dependents layer by layer
 
 Usage:
     python tests/test_phcore.py
-    python tests/test_phcore.py --base-url http://localhost:8080/fhir
-    python tests/test_phcore.py --base-url http://localhost:8080/fhir --examples-dir testdata/ph-core-examples
+    python tests/test_phcore.py --base-url https://cdr.phcore.fhirlab.net/fhir
 """
 
 import json, os, sys, glob, time, argparse
@@ -418,7 +424,7 @@ def generate_narrative(results: list[TestResult], total_time: float) -> list[str
     return lines
 
 
-def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, server_up: bool, total_time: float = 0) -> str:
+def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, server_up: bool, total_time: float = 0, linear_count: int = 0, circular_count: int = 0) -> str:
     passed = sum(1 for r in results if r.success)
     total = len(results)
     failed = [r for r in results if not r.success]
@@ -432,6 +438,18 @@ def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, 
         f"- **Total:** {total}  **Passed:** {passed}  **Failed:** {total - passed}  **Pass Rate:** {passed/total*100:.0f}%",
         f"",
     ]
+    if server_up and (linear_count or circular_count):
+        lines += [
+            "### Loading Strategy",
+            "",
+            "Resources are loaded in dependency order to satisfy cross-references prior to dependent PUTs:",
+            "",
+        ]
+        if circular_count:
+            lines.append(f"- **{circular_count} circular dependency group(s)** (Condition ↔ Encounter) — POSTed as inline transaction Bundles")
+        if linear_count:
+            lines.append(f"- **{linear_count} resource(s)** in topological dependency order — PUT individually")
+        lines.append("")
 
     if server_up:
         lines.append(f"| # | Resource | Method | URL | Status | Time (s) | Result |")
@@ -634,6 +652,11 @@ def main():
 
     # 2. POST inline Bundles for circular dependency groups (e.g. Condition ↔ Encounter)
     put_order, circular_groups = resolve_put_order(resource_files) if server_up else (resource_files, [])
+    if server_up:
+        linear = len(put_order)
+        cycled = sum(len(g) for g in circular_groups)
+        print(f"Dependency order: {linear} resources linearly, {len(circular_groups)} circular group(s) ({cycled} resources via Bundles)")
+        print()
     if server_up and circular_groups:
         import tempfile, uuid as uuid_mod
         for group_paths in circular_groups:
@@ -705,7 +728,9 @@ def main():
     os.makedirs(report_dir, exist_ok=True)
     report_path = os.path.join(report_dir, f"test-report-phcore-{domain_label}-{ts}.md")
     with open(report_path, "w") as f:
-        f.write(generate_markdown(results, ts, base_url, server_up, total_wall_time))
+        linear_count = len(put_order)
+        circular_count = sum(len(g) for g in circular_groups) if circular_groups else 0
+        f.write(generate_markdown(results, ts, base_url, server_up, total_wall_time, linear_count, circular_count))
     print(f"\nReport saved: {report_path}")
 
 
