@@ -101,7 +101,7 @@ python3 tests/test_phcore.py --base-url https://fhirportal.telehealth.ph/phcore/
 
 ### What it does
 
-- Loads 45 example FHIR resources from `PHeRef/testdata/ph-core-examples/` (sourced from PH Core IG build)
+- Loads 26 example FHIR resources from `PHeRef/testdata/ph-core-examples/` (sourced from PH Core IG build, filtered to Patient/Organization/Practitioner/PractitionerRole/Condition/Encounter/Observation profiles)
 - **Phase 1** (Bundle): `POST` the transaction Bundles (ACS case + Single transaction) — creates core resources atomically
 - **Phase 2** (individual): `PUT` each resource independently
 - Falls back to dry-run (JSON validation only) if server unreachable
