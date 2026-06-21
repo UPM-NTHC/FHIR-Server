@@ -454,6 +454,128 @@ def generate_markdown(results: list[TestResult], timestamp: str, base_url: str, 
 
 
 # ---------------------------------------------------------------------------
+# dependency ordering
+# ---------------------------------------------------------------------------
+
+def _collect_refs(obj, refs: set):
+    """Recursively collect all reference values of form ResourceType/ID."""
+    if isinstance(obj, dict):
+        if "reference" in obj and isinstance(obj["reference"], str) and "/" in obj["reference"]:
+            refs.add(obj["reference"])
+        for v in obj.values():
+            _collect_refs(v, refs)
+    elif isinstance(obj, list):
+        for item in obj:
+            _collect_refs(item, refs)
+
+
+def build_dependency_map(file_paths: list[str]) -> tuple[dict[str, set[str]], dict[str, str]]:
+    """Build {resource_id: {dep_resource_id, ...}} and {resource_id: file_path}."""
+    known_ids: set[str] = set()
+    id_to_path: dict[str, str] = {}
+
+    for fpath in file_paths:
+        with open(fpath) as f:
+            resource = json.load(f)
+        res_id = f"{resource['resourceType']}/{resource['id']}"
+        known_ids.add(res_id)
+        id_to_path[res_id] = fpath
+
+    dep_map: dict[str, set[str]] = {}
+    for fpath in file_paths:
+        with open(fpath) as f:
+            resource = json.load(f)
+        res_id = f"{resource['resourceType']}/{resource['id']}"
+        refs: set[str] = set()
+        _collect_refs(resource, refs)
+        dep_map[res_id] = {r for r in refs if r in known_ids}
+
+    return dep_map, id_to_path
+
+
+def _find_cycles(dep_map: dict[str, set[str]]) -> list[set[str]]:
+    """Find strongly connected components (cycles) in the dependency graph."""
+    nodes = list(dep_map.keys())
+    index = {n: -1 for n in nodes}
+    lowlink = {n: -1 for n in nodes}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    cycles: list[set[str]] = []
+    idx = [0]
+
+    def strongconnect(v: str):
+        index[v] = lowlink[v] = idx[0]
+        idx[0] += 1
+        stack.append(v)
+        on_stack.add(v)
+        for w in dep_map.get(v, set()):
+            if w not in index:
+                continue
+            if index[w] == -1:
+                strongconnect(w)
+                lowlink[v] = min(lowlink[v], lowlink[w])
+            elif w in on_stack:
+                lowlink[v] = min(lowlink[v], index[w])
+        if lowlink[v] == index[v]:
+            scc: set[str] = set()
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                scc.add(w)
+                if w == v:
+                    break
+            if len(scc) > 1:
+                cycles.append(scc)
+
+    for n in nodes:
+        if index[n] == -1:
+            strongconnect(n)
+    return cycles
+
+
+def resolve_put_order(file_paths: list[str]) -> tuple[list[str], list[list[str]]]:
+    """Return (file_paths_in_order, circular_groups).
+
+    Resources with satisfied dependencies are loaded first. Circular pairs
+    (e.g. Condition ↔ Encounter) are returned as groups in circular_groups
+    for the caller to POST as Bundles. Resources with dependencies on
+    removed types end up last in the linear order.
+    """
+    dep_map, id_to_path = build_dependency_map(file_paths)
+
+    cycles = _find_cycles(dep_map)
+
+    cycle_ids: set[str] = set()
+    for grp in cycles:
+        cycle_ids.update(grp)
+
+    loaded: set[str] = set()
+    ordered: list[str] = []
+    remaining = set(dep_map.keys()) - cycle_ids
+
+    for _ in range(5):
+        if not remaining:
+            break
+        batch = []
+        for res_id in list(remaining):
+            # deps in cycles are treated as always-satisfied for linear ordering
+            effective_deps = dep_map[res_id] - cycle_ids
+            if effective_deps.issubset(loaded):
+                batch.append(res_id)
+                remaining.remove(res_id)
+        for res_id in sorted(batch):
+            ordered.append(id_to_path[res_id])
+            loaded.add(res_id)
+
+    for res_id in sorted(remaining):
+        ordered.append(id_to_path[res_id])
+
+    circular_groups = [[id_to_path[rid] for rid in sorted(grp)] for grp in cycles]
+
+    return ordered, circular_groups
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -510,8 +632,41 @@ def main():
                     print(f"  └─ Warning: could not build UUID map ({e})")
             print()
 
-    # 2. PUT individual resources — with resolved references
-    for fpath in resource_files:
+    # 2. POST inline Bundles for circular dependency groups (e.g. Condition ↔ Encounter)
+    put_order, circular_groups = resolve_put_order(resource_files) if server_up else (resource_files, [])
+    if server_up and circular_groups:
+        import tempfile, uuid as uuid_mod
+        for group_paths in circular_groups:
+            uuid_map_local: dict[str, str] = {}
+            entries = []
+            resources = []
+            for fpath in group_paths:
+                with open(fpath) as f:
+                    resource = json.load(f)
+                uid = f"urn:uuid:{uuid_mod.uuid4()}"
+                resources.append((resource, uid))
+                entries.append({"fullUrl": uid, "resource": resource, "request": {"method": "PUT", "url": f"{resource['resourceType']}/{resource['id']}"}})
+            for resource, _ in resources:
+                replace_urn_uuid_refs(resource, uuid_map_local)
+            bundle = {"resourceType": "Bundle", "type": "transaction", "entry": entries}
+            fname = "+".join(os.path.basename(p).replace(".json", "") for p in group_paths)
+            print(f"[Circular Bundle: {fname}]")
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+            json.dump(bundle, tmp)
+            tmp.close()
+            bundle_response = post_bundle(base_url, tmp.name, timeout, results)
+            if bundle_response and bundle_response.get("resourceType") == "Bundle":
+                try:
+                    uuid_map = build_uuid_map_from_bundle_response(bundle_response, bundle)
+                    if uuid_map:
+                        print(f"  └─ Resolved {len(uuid_map)} urn:uuid → Resource/ID mappings")
+                except Exception as e:
+                    print(f"  └─ Warning: could not build UUID map ({e})")
+            os.unlink(tmp.name)
+            print()
+
+    # 3. PUT individual resources — in dependency order
+    for fpath in put_order:
         fname = os.path.basename(fpath)
         print(f"[{fname}]")
         if not server_up:
