@@ -132,18 +132,22 @@ hapi:
         system: "http://unitsofmeasure.org"
         url: "https://tx.fhir.org/r4"
       # HL7 standard terminologies → tx.fhir.org (comprehensive coverage)
-      hl7:
-        system: "http://terminology.hl7.org"
-        url: "https://tx.fhir.org/r4"
+      # hl7:
+      #   system: "http://terminology.hl7.org"
+      #   url: "https://tx.fhir.org/r4"
       # LOINC → tx.fhir.org (more reliable UCUM+LOINC)
       loinc:
         system: "http://loinc.org"
-        url: "https://tx.fhir.org/r4"
+        url: "https://tx.fhirlab.net/fhir"
       # SNOMED → tx.fhirlab.net (Ontoserver)
       snomed:
-        system: "https://snomed.info/sct"
-        url: "https://tx.fhirlab.net/fhir"
+        system: "http://snomed.info/sct"
       # PH-specific CodeSystems → tx.fhirlab.net (Ontoserver)
+        url: "https://tx.fhirlab.net/fhir"
+      snomed-https:
+        system: "https://snomed.info/sct"
+      # PH-specific CodeSystems → tx.fhirlab.net (Ontoserver)
+        url: "https://tx.fhirlab.net/fhir"
       phcw:
         system: "https://fhir.doh.gov.ph/phcore/CodeSystem/PHCW"
         url: "https://tx.fhirlab.net/fhir"
@@ -159,7 +163,9 @@ hapi:
       psoc-unit:
         system: "https://psa.gov.ph/classification/psoc/unit"
         url: "https://tx.fhirlab.net/fhir"
-      # Catch-all: everything else → tx.fhir.org
+      bcp:
+        system: "urn:ietf:bcp:47"
+        url: "https://tx.fhir.org/r4"
       all:
         system: "*"
         url: "https://tx.fhir.org/r4"
