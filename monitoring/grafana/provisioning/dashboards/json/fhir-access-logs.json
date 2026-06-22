@@ -1,0 +1,134 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"eref-hapi\"} | pattern `verb=<verb> path=<path> op=<op> opName=<_> resource=<resource>` [1m])) by (verb)",
+          "legendFormat": "{{verb}}",
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Request Rate by Resource",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<_> opName=<_> resource=<resource>` [1m])) by (resource)",
+          "legendFormat": "{{resource}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Response Time (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.50, {job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<_> opName=<_> resource=<_> remoteAddr=<_> forwardedFor=<_> userAgent=<_> requestId=<_> params=<_> processingMs=<processingMs>` | unwrap processingMs [5m]) by ()",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<_> opName=<_> resource=<_> remoteAddr=<_> forwardedFor=<_> userAgent=<_> requestId=<_> params=<_> processingMs=<processingMs>` | unwrap processingMs [5m]) by ()",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "quantile_over_time(0.99, {job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<_> opName=<_> resource=<_> remoteAddr=<_> forwardedFor=<_> userAgent=<_> requestId=<_> params=<_> processingMs=<processingMs>` | unwrap processingMs [5m]) by ()",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"eref-hapi\"} |= \"error=\" [1m]))",
+          "legendFormat": "errors/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "fixed", "fixedColor": "red" } },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Top Resources (last 1h)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<_> opName=<_> resource=<resource>` [1h])) by (resource)",
+          "legendFormat": "{{resource}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Operations Breakdown (last 1h)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"eref-hapi\"} | pattern `verb=<_> path=<_> op=<op>` [1h])) by (op)",
+          "legendFormat": "{{op}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Recent Access Logs",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "{job=\"eref-hapi\"} |= \"verb=\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["fhir", "eref", "access-logs"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FHIR eReferral Access Logs",
+  "uid": "fhir-eref-access",
+  "version": 1
+}
