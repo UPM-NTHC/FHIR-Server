@@ -1,6 +1,14 @@
 spring:
+  # Flyway: Database migration tool. HAPI FHIR JPA uses Flyway to manage
+  # versioned schema migrations. However, Hibernate's hbm2ddl.auto=update
+  # already handles schema creation/evolution for HAPI. Additionally, Flyway
+  # Community Edition 10.x does NOT support PostgreSQL ≥15 (requires Teams/
+  # Enterprise license). Disabling Flyway is safe here since Hibernate handles
+  # schema management. See: hapifhir/hapi-fhir-jpaserver-starter#694
+  flyway:
+    enabled: false
   main:
-    allow-circular-references: truedoc
+    allow-circular-references: true
   datasource:
     url: jdbc:postgresql://db:5432/hapi
     username: admin
@@ -24,7 +32,7 @@ hapi:
     tester:
       home:
         name: PH eReferral FHIR Server
-        server_address: '${FHIR_SERVER_ADDRESS:http://localhost}:${FHIR_SERVER_PORT:8080}/fhir'
+        server_address: '${PHEREF_SERVER_ADDRESS:http://localhost}:${PHEREF_SERVER_PORT:8080}/fhir'
         refuse_to_fetch_third_party_urls: false
         fhir_version: R4
 
@@ -66,18 +74,17 @@ hapi:
         reloadExisting: false
         installMode: STORE_AND_INSTALL
         packageUrl: https://fhirhub.telehealth.ph/IG/PH-Core/package.tgz
-        fetchDependencies: false
+        fetchDependencies: true
         installResourceTypes:
           - StructureDefinition
           - SearchParameter
           - NamingSystem
           - Subscription
-          - ImplementationGuide
-          # So that the passthrough validation will go to Ontoserver
-          # Caveat. Longer Ping Pong validation 
-          # - CodeSystem
-          # - ValueSets
-
+        dependencyExcludes:
+          - "hl7.fhir.uv.extensions"
+          - "hl7.fhir.uv.extensions.r4"
+          - hl7.fhir.uv.extensions.r5
+          - "hl7.terminology.r5"
       ph_eref:
         name: fhir.ph.ereferral
         version: 0.1.0
@@ -92,12 +99,6 @@ hapi:
           - SearchParameter
           - NamingSystem
           - Subscription
-          - ImplementationGuide # Not sure if needed
-          # So that the passthrough validation will go to Ontoserver
-          # Caveat. Longer Ping Pong validation 
-          # - CodeSystem
-          # - ValueSets
-
         dependencyExcludes:
           - "hl7.fhir.uv.extensions"
           - "hl7.fhir.uv.extensions.r4"
@@ -111,7 +112,6 @@ hapi:
         installMode: STORE_AND_INSTALL
         fetchDependencies: true
         installResourceTypes:
-          - ImplementationGuide
           - StructureDefinition
           - SearchParameter
         dependencyExcludes:
@@ -127,16 +127,26 @@ hapi:
       - http://loinc.org/*
       - https://loinc.org/*
     remote_terminology_service:
-      # UCUM not handled correctly on Ontoserver at the moment
+      # UCUM → tx.fhir.org (tx.fhirlab.net doesn't support UCUM)
       ucum:
-        system: "http://loinc.org"
+        system: "http://unitsofmeasure.org"
         url: "https://tx.fhir.org/r4"
-      # The rest are routed to Ontoserver
+      # HL7 standard terminologies → tx.fhir.org (comprehensive coverage)
+      # hl7:
+      #   system: "http://terminology.hl7.org"
+      #   url: "https://tx.fhir.org/r4"
+      # LOINC → tx.fhir.org (more reliable UCUM+LOINC)
       loinc:
         system: "http://loinc.org"
         url: "https://tx.fhirlab.net/fhir"
+      # SNOMED → tx.fhirlab.net (Ontoserver)
       snomed:
+        system: "http://snomed.info/sct"
+      # PH-specific CodeSystems → tx.fhirlab.net (Ontoserver)
+        url: "https://tx.fhirlab.net/fhir"
+      snomed-https:
         system: "https://snomed.info/sct"
+      # PH-specific CodeSystems → tx.fhirlab.net (Ontoserver)
         url: "https://tx.fhirlab.net/fhir"
       phcw:
         system: "https://fhir.doh.gov.ph/phcore/CodeSystem/PHCW"
@@ -153,3 +163,9 @@ hapi:
       psoc-unit:
         system: "https://psa.gov.ph/classification/psoc/unit"
         url: "https://tx.fhirlab.net/fhir"
+      bcp:
+        system: "urn:ietf:bcp:47"
+        url: "https://tx.fhir.org/r4"
+      all:
+        system: "*"
+        url: "https://tx.fhir.org/r4"

@@ -265,7 +265,7 @@ FHIR-Server/
 │   └── src/                    # Java sources and tests
 ├── PHeRef/                     # PH eReferral FHIR server
 │   ├── docker-compose.yml      # Stack: eref-hapi + eref-db
-│   ├── .env                    # FHIR_SERVER_ADDRESS, FHIR_SERVER_PORT
+│   ├── .env                    # PHEREF_SERVER_ADDRESS, PHEREF_SERVER_PORT
 │   ├── Dockerfile              # Multi-stage build (Maven → distroless)
 │   ├── pom.xml                 # HAPI FHIR JPA dependencies
 │   ├── config/
@@ -290,7 +290,7 @@ FHIR-Server/
 | Implementation Guides | PH Core, HL7 Extensions R4 | PH Core, PH eReferral, HL7 Extensions R4 |
 | Terminology routing | Wildcard → Ontoserver | Per-system routing (Ontoserver + tx.fhir.org) |
 | Container name | phcore-hapi | eref-hapi |
-| Port configurable via .env | No | Yes (`FHIR_SERVER_PORT`) |
+| Port configurable via .env | No | Yes (`PHEREF_SERVER_PORT`) |
 | IG dependency fetching | `fetchDependencies: true` | Selective (`false` for PH Core, `true` for eRef) |
 | Access logging | Disabled | Enabled (structured, `fhirtest.access`) |
 
